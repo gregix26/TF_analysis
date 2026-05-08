@@ -3,18 +3,18 @@ set -euo pipefail
 
 # SNP CSV file. Expected columns:
 # chrom,pos,id,ref,alt
-SNPS="${1:-/home/kg522/data/TF_motif_analysis/GPNMB_variants_pass.csv}"
+SNPS="${1:-/home/kg522/data/TF_motif_analysis/variants_pass.csv}" # your prioritized variants
 
 # Genome reference
-GENOME="${2:-/home/kg522/data/ensembl-vep/vep_plugin_data/fasta/hg38.fa}"
-MOTIFS="${3:-$HOME/.conda/envs/HOMER/share/homer-4.10-0/motifs/human_motifs/human_only.motifs}"
+GENOME="${2:-/home/kg522/data/ensembl-vep/vep_plugin_data/fasta/hg38.fa}" # reference genome FASTA
+MOTIFS="${3:-$HOME/.conda/envs/HOMER/share/homer-4.10-0/motifs/human_motifs/human_only.motifs}" # selected human motifs
 
 REF_FASTA="ref.fa"
 ALT_FASTA="alt.fa"
 TMP_FASTA="$(mktemp)"
 trap 'rm -f "$TMP_FASTA"' EXIT
 
-WINDOW=20
+WINDOW=20 # window around SNP
 CENTER=$WINDOW
 
 : > "$REF_FASTA"
