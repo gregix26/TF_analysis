@@ -14,45 +14,12 @@ import tfmindi as tm
 BASE_DIR = "/home/kg522/data/TF_motif_analysis/"
 WINDOW = 20  # number of bases on each side of the SNP to consider for motif similarity
 TOP_K = 3  # top motifs across all cell types
+MIN_DELTA = 0.05  # ignore very small motif-similarity changes
 
 
 def empirical_percentile(values, target_value):
     values = np.asarray(values, dtype=float)
     return 100.0 * np.mean(values <= float(target_value))
-
-
-def empirical_two_sided_pvalues(values):
-    if isinstance(values, pd.Series):
-        index = values.index
-        numeric_values = values.to_numpy(dtype=float)
-    else:
-        index = None
-        numeric_values = np.asarray(values, dtype=float)
-
-    abs_values = np.abs(numeric_values)
-    n = len(abs_values)
-    return pd.Series(
-        [((abs_values >= value).sum() + 1) / (n + 1) for value in abs_values],
-        index=index,
-    )
-
-
-def benjamini_hochberg(pvalues):
-    pvalues = np.asarray(pvalues, dtype=float)
-    n = len(pvalues)
-
-    if n == 0:
-        return np.array([])
-
-    order = np.argsort(pvalues)
-    ranked = pvalues[order]
-    adjusted = ranked * n / np.arange(1, n + 1)
-    adjusted = np.minimum.accumulate(adjusted[::-1])[::-1]
-    adjusted = np.clip(adjusted, 0, 1)
-
-    qvalues = np.empty(n, dtype=float)
-    qvalues[order] = adjusted
-    return qvalues
 
 
 def interpret_delta_strength(delta_score):
@@ -115,25 +82,19 @@ def compute_cell_type_metrics(ref, alt, motif_collection):
     motif_names = list(motif_collection.keys())
     sim_ref = pd.Series(sim_ref, index=motif_names)
     sim_alt = pd.Series(sim_alt, index=motif_names)
-    delta_tf = sim_alt - sim_ref
-    delta_abs_tf = sim_alt.abs() - sim_ref.abs()
+    delta_similarity = sim_alt - sim_ref
 
     importance = np.abs(delta_full).sum(axis=1)
     snp_score = float(importance[center])
     snp_percentile = empirical_percentile(importance, snp_score)
     z_score = (snp_score - importance.mean()) / (importance.std() + 1e-6)
 
-    motif_pvalues = empirical_two_sided_pvalues(delta_abs_tf)
-    motif_qvalues = pd.Series(
-        benjamini_hochberg(motif_pvalues.values),
-        index=delta_tf.index,
-    )
-    motif_abs_percentiles = pd.Series(
+    delta_percentiles = pd.Series(
         [
-            empirical_percentile(np.abs(delta_abs_tf.values), abs(delta_score))
-            for delta_score in delta_abs_tf.values
+            empirical_percentile(np.abs(delta_similarity.values), abs(delta_score))
+            for delta_score in delta_similarity.values
         ],
-        index=delta_tf.index,
+        index=delta_similarity.index,
     )
 
     return {
@@ -142,49 +103,16 @@ def compute_cell_type_metrics(ref, alt, motif_collection):
         "z_score": float(z_score),
         "sim_ref": sim_ref,
         "sim_alt": sim_alt,
-        "delta_tf": delta_tf,
-        "delta_abs_tf": delta_abs_tf,
-        "motif_pvalues": motif_pvalues,
-        "motif_qvalues": motif_qvalues,
-        "motif_abs_percentiles": motif_abs_percentiles,
+        "delta_similarity": delta_similarity,
+        "delta_percentiles": delta_percentiles,
     }
 
 
-def contribution_sign(similarity_score):
-    similarity_score = float(similarity_score)
-    if similarity_score > 0:
-        return "Positive"
-    if similarity_score < 0:
-        return "Negative"
-    return "Neutral"
-
-
-def interpret_motif_effect(ref_similarity, alt_similarity):
-    ref_similarity = float(ref_similarity)
-    alt_similarity = float(alt_similarity)
-    strength_delta = abs(alt_similarity) - abs(ref_similarity)
-    alt_sign = contribution_sign(alt_similarity)
-    ref_sign = contribution_sign(ref_similarity)
-
-    if strength_delta > 0:
-        strength_direction = "Gain"
-    elif strength_delta < 0:
-        strength_direction = "Loss"
-    else:
-        strength_direction = "No change"
-
-    if ref_sign != alt_sign and ref_sign != "Neutral" and alt_sign != "Neutral":
-        return f"Sign flip to {alt_sign.lower()}"
-    if strength_direction == "No change":
-        return f"No strength change ({alt_sign.lower()})"
-    return f"{alt_sign} motif {strength_direction.lower()}"
-
-
-def motif_strength_direction(motif_strength_delta):
-    motif_strength_delta = float(motif_strength_delta)
-    if motif_strength_delta > 0:
+def motif_effect(delta_similarity):
+    delta_similarity = float(delta_similarity)
+    if delta_similarity >= MIN_DELTA:
         return "Gain"
-    if motif_strength_delta < 0:
+    if delta_similarity <= -MIN_DELTA:
         return "Loss"
     return "No change"
 
@@ -192,17 +120,14 @@ def motif_strength_direction(motif_strength_delta):
 def build_motif_rows(snp_id, cell_type, metrics):
     sim_ref_map = metrics["sim_ref"].to_dict()
     sim_alt_map = metrics["sim_alt"].to_dict()
-    delta_abs_tf_map = metrics["delta_abs_tf"].to_dict()
-    motif_pvalues_map = metrics["motif_pvalues"].to_dict()
-    motif_qvalues_map = metrics["motif_qvalues"].to_dict()
-    motif_abs_percentiles_map = metrics["motif_abs_percentiles"].to_dict()
+    delta_percentiles_map = metrics["delta_percentiles"].to_dict()
 
     rows = []
-    for motif_name, delta_score in metrics["delta_tf"].items():
+    for motif_name, delta_score in metrics["delta_similarity"].items():
         ref_similarity = float(sim_ref_map[motif_name])
         alt_similarity = float(sim_alt_map[motif_name])
-        motif_strength_delta = float(delta_abs_tf_map[motif_name])
-        direction = motif_strength_direction(motif_strength_delta)
+        delta_similarity = float(delta_score)
+        direction = motif_effect(delta_similarity)
         rows.append({
             "SNP": snp_id,
             "Cell_type": cell_type,
@@ -212,37 +137,32 @@ def build_motif_rows(snp_id, cell_type, metrics):
             "SNP_importance_percentile": round(metrics["snp_percentile"], 2),
             "Ref_similarity": round(ref_similarity, 6),
             "Alt_similarity": round(alt_similarity, 6),
-            "Signed_delta_score": round(float(delta_score), 6),
-            "Motif_strength_delta": round(motif_strength_delta, 6),
-            "Alt_contribution_sign": contribution_sign(alt_similarity),
-            "Interpretable_effect": interpret_motif_effect(ref_similarity, alt_similarity),
-            "Delta_strength": interpret_delta_strength(motif_strength_delta),
-            "Delta_abs_percentile": round(float(motif_abs_percentiles_map[motif_name]), 2),
-            "Empirical_pvalue": round(float(motif_pvalues_map[motif_name]), 6),
-            "BH_FDR": round(float(motif_qvalues_map[motif_name]), 6),
+            "Delta_similarity": round(delta_similarity, 6),
+            "Delta_strength": interpret_delta_strength(delta_similarity),
+            "Delta_abs_percentile": round(float(delta_percentiles_map[motif_name]), 2),
         })
 
     return rows
 
 
 def summarize_top_hits(motif_rows_df, top_k):
-    gain_df = motif_rows_df[motif_rows_df["Motif_strength_delta"] > 0]
-    loss_df = motif_rows_df[motif_rows_df["Motif_strength_delta"] < 0]
+    gain_df = motif_rows_df[motif_rows_df["Delta_similarity"] >= MIN_DELTA]
+    loss_df = motif_rows_df[motif_rows_df["Delta_similarity"] <= -MIN_DELTA]
 
-    top_gain_df = gain_df.nlargest(top_k, "Motif_strength_delta")
-    top_loss_df = loss_df.nsmallest(top_k, "Motif_strength_delta")
+    top_gain_df = gain_df.nlargest(top_k, "Delta_similarity")
+    top_loss_df = loss_df.nsmallest(top_k, "Delta_similarity")
     top_hits_df = pd.concat([top_gain_df, top_loss_df], ignore_index=True)
 
     gain_str = ";".join(
-        f"{row.Motif}@{row.Cell_type}({row.Alt_contribution_sign})"
+        f"{row.Motif}@{row.Cell_type}"
         for row in top_gain_df.itertuples(index=False)
     )
     loss_str = ";".join(
-        f"{row.Motif}@{row.Cell_type}({row.Alt_contribution_sign})"
+        f"{row.Motif}@{row.Cell_type}"
         for row in top_loss_df.itertuples(index=False)
     )
 
-    tf_effect = float(top_hits_df["Motif_strength_delta"].abs().mean()) if not top_hits_df.empty else 0.0
+    tf_effect = float(top_hits_df["Delta_similarity"].abs().mean()) if not top_hits_df.empty else 0.0
     return top_gain_df, top_loss_df, gain_str, loss_str, tf_effect
 
 
@@ -341,7 +261,7 @@ if not df.empty:
 
 if not motif_detail_df.empty:
     motif_detail_df = motif_detail_df.sort_values(
-        ["SNP", "Direction", "Motif_strength_delta"],
+        ["SNP", "Direction", "Delta_similarity"],
         ascending=[True, True, False],
     )
 
