@@ -18,7 +18,7 @@ Output per SNP:
 
 Usage:
     python snp_contrib_pipeline.py \\
-        --snp_csv  snps_pass_atac.csv \\
+        --snp_csv  snps.csv \\
         --fasta    hg38.fa \\
         --output   results/
 """
@@ -168,17 +168,6 @@ def compute_contributions(batch, model, output_names, method):
         { "AST": np.ndarray (N, 500, 4),
           "EXC_L2_3_IT": np.ndarray (N, 500, 4),
           ... }
-
-    WHY PER CELL TYPE:
-    The contribution score answers "how important is this nucleotide for
-    predicting accessibility in cell type X" — it is cell-type-specific.
-    Accumulating across classes would discard that information entirely.
-
-    WHY WE LOOP WITH EXPLICIT target_idx:
-    Passing target_idx=None causes CREsted to return inconsistent shapes
-    (the first class gets an extra class dimension). Passing an explicit
-    integer returns only that class at result[0], which we squeeze to
-    remove the residual size-1 axis.
     """
     scores_by_class = {}
 
