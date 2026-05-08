@@ -40,10 +40,13 @@ Negative delta -> change in the allele weaked the model's prediction for open ch
 The contribution scores (per cell type) can be visualized with alt_vs_ref_plot.py. This will produce two figures, one reference and one alternate sequence plot with SNP in the centre. 
 
 ### Run TF-MINDI motif similarity analysis
-Run MINDI_TF_analysis_across_all.py. 
-TF-MINDI extracts seqlets (important sequence fragments) based on the contribution score. Here, however, I am extracting the 20bp window around my SNP of interest, whether it is a seqlet or not. Motif similarity will scan the sequence syntax for familiar motifs levaraging the cell-type-specific contribution scores of neighboring nucleotides. This gives the analysis context-dependent and cell-type-specific advantage. From a strip of sequence, different motifs can match to different cell types, based on their dissimilar contribution scores. Delta is calculated from REF-ALR motif similarity and further statistical corrections are added. The script categorizes variants as
-1. Gain -> motif syntax strengthened upon alternate allele
-2. Loss -> motif syntax weakedn upon alternate allele
+Run MINDI_TF_analysis_across_all.py. TF-MINDI runs on contribution scores and not raw sequences!
+
+TF-MINDI extracts seqlets (important sequence fragments) based on the contribution score. Here, however, I am extracting the 20bp window around my SNP of interest, whether it is a seqlet or not. 
+
+calculate_motif_similarity() compares the supplied contribution/seqlet matrix to known motifs using TomTom, then converts the TomTom p-value to -log10(p). So higher means “more similar to this known motif”; zero/near-zero means weak or no match. This gives the analysis context-dependent and cell-type-specific advantage. From a strip of sequence, different motifs can match to different cell types, based on their dissimilar contribution scores. Delta is calculated from REF-ALR motif similarity and interpreted as such
+1. Positive delta = ALT looks more like that motif than REF, "motif gain"
+2. Negative delta = ALT looks less like that motif than REF, "motif loss"
 
 Summarize results by running tf_family_summary.py
 Plot the top motif gain/loss in a table with plot_per_snp_tf_family_table.py
