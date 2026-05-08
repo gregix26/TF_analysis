@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import crested
 
-snp_dir = "/home/kg522/data/TF_motif_analysis/GPNMB_output_Menon_per_class/rs858239"
+snp_dir = "/home/kg522/data/TF_motif_analysis/"
 
 # --- load data ---
 ref_scores = np.load(f"{snp_dir}/contrib_ref_VASC.npy")
