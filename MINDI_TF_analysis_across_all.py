@@ -11,7 +11,7 @@ import tfmindi as tm
 # ---------------------
 # CONFIG
 # ---------------------
-BASE_DIR = "/home/kg522/data/TF_motif_analysis/GPNMB_output_Menon_per_class"
+BASE_DIR = "/home/kg522/data/TF_motif_analysis/"
 WINDOW = 20  # number of bases on each side of the SNP to consider for motif similarity
 TOP_K = 3  # top motifs across all cell types
 
