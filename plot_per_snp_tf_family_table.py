@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 # ---------------------
 # CONFIG
 # ---------------------
-BASE_DIR = "/home/kg522/data/TF_motif_analysis/GPNMB_output_Menon_per_class"
+BASE_DIR = "/home/kg522/data/TF_motif_analysis/"
 INPUT_CSV = os.path.join(BASE_DIR, "top_motif_hits_with_tf_families.csv")
 TARGET_SNP = "rs199357"
 
