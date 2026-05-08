@@ -26,8 +26,15 @@ Dependendies: pybedtools pysam
 There's two human brain pre-trained models, I use DeepHumanCortex1 here (snRNA+snATAC of 13 brain cell types). Downloand and check with brain_model_crested.py
 
 ### CRESted prediction for open chromatin from sequence alone
-1. Positive delta -> change in the allele boosted the model's prediction for open chromatin in this region 
-2. Negative delta -> change in the allele weaked the model's prediction for open chromatin in this region
+Run crested_contr_score.py for calculating the importance of each nulceotide for the prediction of chromatin accessibility in a cell type.
+1. Extract ±250bp reference and alternative sequences from FASTA (model was trained on 500bp so cannot get higher).
+2. One-hot encode both
+3. Compute per-nucleotide contribution scores (once per sequence)
+4. Save per-SNP directory with one-hot arrays and contribution scores
+   
+If calculated, the delta between REF-ALT nucleotide contribution score would mean:
+Positive delta -> change in the allele boosted the model's prediction for open chromatin in this region 
+Negative delta -> change in the allele weaked the model's prediction for open chromatin in this region
 
 ### Plotting contribution scores 
 The contribution scores (per cell type) can be visualized with alt_vs_ref_plot.py. This will produce two figures, one reference and one alternate sequence plot with SNP in the centre. 
